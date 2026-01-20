@@ -34,3 +34,8 @@
         state_store.json (to persist S_prev: meaning just stores the last know snapshot)
         run_poll ( this coordinates the whole flow: loads, calls, runs, emits events and saves. //glue layer)
         
+    current status:
+    snapshot ingestion validated using curl
+    CDC logic implemented and tested locally
+    first successful run emitted 227 job_created events 
+    state persistence was verified
