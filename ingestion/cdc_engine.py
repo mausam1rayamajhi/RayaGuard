@@ -6,6 +6,19 @@ from datetime import datetime, timezone
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
+def _normalize_list(items):
+    """
+    items might be list[dict] or list[str]. Make ordering stable.
+    """
+    if not items:
+        return []
+    if isinstance(items[0], dict):
+        # sorting by id if present, else name, else whole dict
+        def keyfn(x):
+            return (str(x.get("id", "")), str(x.get("name", "")), json.dumps(x, sort_keys=True))
+        return sorted(items, key=keyfn)
+    return sorted([str(x) for x in items])
+
 def build_fingerprint(job:dict) -> str:
     """
     building a stable fingerprint for job
