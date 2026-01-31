@@ -1,45 +1,38 @@
-#comparing S_now and S_prev and emitting CDC events
-
+# cdc_engine.py
 import hashlib
+import json
 from datetime import datetime, timezone
+
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
 
-def _normalize_list(items):
-    """
-    items might be list[dict] or list[str]. Make ordering stable.
-    """
-    if not items:
-        return []
-    if isinstance(items[0], dict):
-        # sorting by id if present, else name, else whole dict
-        def keyfn(x):
-            return (str(x.get("id", "")), str(x.get("name", "")), json.dumps(x, sort_keys=True))
-        return sorted(items, key=keyfn)
-    return sorted([str(x) for x in items])
 
-def build_fingerprint(job:dict) -> str:
+def build_fingerprint(job: dict) -> str:
     """
-    building a stable fingerprint for job
+    Creating a stable fingerprint from key job fields.
+    Keep this SIMPLE to avoid false updates.
+    Basically just important content of job posting
     """
-    relevent_fields = {
-        "title":job.get("title"),
-        "location":job.get("location"),
-        "departments":job.get("departments"),
-        "offices":job.get("offices"),
-        "content":job.get("content"),
+    payload = {
+        "title": job.get("title"),
+        "location": job.get("location"),
     }
-    normalized = str(relevent_fields).encode("utf-8")
+
+    normalized = json.dumps(payload, sort_keys=True).encode("utf-8")
     return hashlib.sha256(normalized).hexdigest()
 
-def detect_cdc_events(board:str, current_jobs:dict, prev_state:dict):
 
+def detect_cdc_events(board: str, current_jobs: dict, prev_state: dict):
     events = []
     new_state = {}
-
     snapshot_time = utc_now()
 
+    # Normalizing job_id to string
+    current_jobs = {str(k): v for k, v in current_jobs.items()}
+    prev_state = {str(k): v for k, v in prev_state.items()}
+
+    # --- created & updated ---
     for job_id, job in current_jobs.items():
         fingerprint = build_fingerprint(job)
         updated_at = job.get("updated_at")
@@ -52,17 +45,8 @@ def detect_cdc_events(board:str, current_jobs:dict, prev_state:dict):
                 "event_ts": updated_at,
                 "ingestion_ts": snapshot_time,
             })
-
-            status = "open"
-
         else:
-            prev = prev_state[job_id]
-            status = prev["status"]
-
-            if (
-                prev["updated_at"] != updated_at
-                or prev["fingerprint"] != fingerprint
-            ):
+            if prev_state[job_id]["fingerprint"] != fingerprint:
                 events.append({
                     "event_type": "job_updated",
                     "board": board,
@@ -72,14 +56,13 @@ def detect_cdc_events(board:str, current_jobs:dict, prev_state:dict):
                 })
 
         new_state[job_id] = {
-            "updated_at": updated_at,
             "fingerprint": fingerprint,
             "status": "open",
         }
 
-    # --- job_closed ---
-    for job_id, prev in prev_state.items():
-        if job_id not in current_jobs and prev["status"] == "open":
+    # --- closed ---
+    for job_id in prev_state:
+        if job_id not in current_jobs:
             events.append({
                 "event_type": "job_closed",
                 "board": board,
@@ -87,9 +70,8 @@ def detect_cdc_events(board:str, current_jobs:dict, prev_state:dict):
                 "event_ts": snapshot_time,
                 "ingestion_ts": snapshot_time,
             })
-
             new_state[job_id] = {
-                **prev,
+                **prev_state[job_id],
                 "status": "closed",
             }
 
