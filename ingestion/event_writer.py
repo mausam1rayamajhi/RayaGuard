@@ -11,9 +11,9 @@ def utc_date_str(ts:datetime | None = None) -> str:
 
 def event_path(base_dir: Path, ts:datetime | None = None)-> Path:
     day= utc_date_str(ts)
-    return base_dir/day/ "events.json1"
+    return base_dir/day/ "events.jsonl"
 
-def append_events_json(base_dir: Path, events:list[dict],ts:datetime | None = None)
+def append_events_jsonl(base_dir: Path, events:list[dict],ts:datetime | None = None)-> Path:
     path = event_path(base_dir, ts)
     path.parent.mkdir(parents=True, exist_ok=True)
 

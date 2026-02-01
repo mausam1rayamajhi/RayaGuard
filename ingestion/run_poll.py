@@ -1,9 +1,11 @@
 
 import json
 from pathlib import Path
-
+from datetime import datetime, timezone
 from fetch_jobs import fetch_jobs
 from cdc_engine import detect_cdc_events
+from ingestion.event_writer import append_events_jsonl
+
 
 BOARD_TOKEN = "airbnb"
 STATE_FILE = Path("ingestion/state_store.json")
@@ -42,7 +44,11 @@ def main():
         prev_state=prev_state,
     )
 
-    emit_events(events)
+    EVENTS_DIR = Path("ingestion/events")
+    now_ts = datetime.now(timezone.utc)
+    events_file = append_events_jsonl(EVENTS_DIR, events, now_ts)
+    print(f"Wrote {len(events)} events to {events_file}")
+
     save_state(new_state)
 
     print(f"Emitted {len(events)} events")
