@@ -10,11 +10,17 @@ STATE_FILE = Path("ingestion/state_store.json")
 EVENTS_FILE = Path("events/emitted_events.json")
 
 def load_state():
+    '''
+    loading the previous state from state_store.json. if the file does not exist, then return empty state
+    '''
     if STATE_FILE.exists():
         return json.loads(STATE_FILE.read_text())
     return {}
 
 def save_state(state: dict):
+    '''
+    saving the new state so next run can be compared against it 
+    '''
     STATE_FILE.write_text(json.dumps(state, indent=2))
 
 def emit_events(events: list):
@@ -24,6 +30,7 @@ def emit_events(events: list):
             f.write(json.dumps(event) + "\n")
 
 def main():
+    #loading the previous state
     prev_state = load_state()
 
     snapshot = fetch_jobs(BOARD_TOKEN)
