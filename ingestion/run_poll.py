@@ -1,10 +1,11 @@
-
+import time
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 from fetch_jobs import fetch_jobs
 from cdc_engine import detect_cdc_events
 from ingestion.event_writer import append_events_jsonl
+from ingestion.metrics import count_event_types
 
 
 BOARD_TOKEN = "airbnb"
@@ -35,6 +36,8 @@ def main():
     #loading the previous state
     prev_state = load_state()
 
+    t0 = time.perf_counter()
+
     snapshot = fetch_jobs(BOARD_TOKEN)
     jobs = {job["id"]: job for job in snapshot["jobs"]}
 
@@ -42,6 +45,17 @@ def main():
         board=BOARD_TOKEN,
         current_jobs=jobs,
         prev_state=prev_state,
+    )
+    runtime_s = time.perf_counter() - t0
+
+    counts = count_event_types(events)
+    total_jobs = len(jobs)
+    emited = len(events)
+    print(
+        f"Fetched {total_jobs} jobs | "
+        f"created={counts['job_created']} updated={counts['job_updated']} "
+        f"closed={counts['job_closed']} reopened={counts['job_reopened']} | "
+        f"emitted={emitted} | runtime={runtime_s:.2f}s"
     )
 
     EVENTS_DIR = Path("ingestion/events")
